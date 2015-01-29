@@ -60,15 +60,6 @@ class Struct:
 specials = {'mitvcanal': 56, 'magicc666': 22, 'livenfree': 18, 'eplsiite': 56, 'soccerjumbo2': 21, 'bguk': 22, 'animachat20': 34, 'pokemonepisodeorg': 55, 'sport24lt': 56, 'mywowpinoy': 5, 'phnoytalk': 21, 'flowhot-chat-online': 12, 'watchanimeonn': 26, 'cricvid-hitcric-': 51, 'fullsportshd2': 18, 'chia-anime': 12, 'narutochatt': 52, 'ttvsports': 56, 'futboldirectochat': 22, 'portalsports': 18, 'stream2watch3': 56, 'proudlypinoychat': 51, 'ver-anime': 34, 'iluvpinas': 53, 'vipstand': 21, 'eafangames': 56, 'worldfootballusch2': 18, 'soccerjumbo': 21, 'myfoxdfw': 22, 'animelinkz': 20, 'rgsmotrisport': 51, 'bateriafina-8': 8, 'as-chatroom': 10, 'dbzepisodeorg': 12, 'tvanimefreak': 54, 'watch-dragonball': 19, 'narutowire': 10, 'leeplarp': 27}
 tsweights = [['5', 75], ['6', 75], ['7', 75], ['8', 75], ['16', 75], ['17', 75], ['18', 75], ['9', 95], ['11', 95], ['12', 95], ['13', 95], ['14', 95], ['15', 95], ['19', 110], ['23', 110], ['24', 110], ['25', 110], ['26', 110], ['28', 104], ['29', 104], ['30', 104], ['31', 104], ['32', 104], ['33', 104], ['35', 101], ['36', 101], ['37', 101], ['38', 101], ['39', 101], ['40', 101], ['41', 101], ['42', 101], ['43', 101], ['44', 101], ['45', 101], ['46', 101], ['47', 101], ['48', 101], ['49', 101], ['50', 101], ['52', 110], ['53', 110], ['55', 110], ['57', 110], ['58', 110], ['59', 110], ['60', 110], ['61', 110], ['62', 110], ['63', 110], ['64', 110], ['65', 110], ['66', 110], ['68', 95], ['71', 116], ['72', 116], ['73', 116], ['74', 116], ['75', 116], ['76', 116], ['77', 116], ['78', 116], ['79', 116], ['80', 116], ['81', 116], ['82', 116], ['83', 116], ['84', 116]]
 def getServer(group):
-        """
-        Get the server host for a certain room.
-        
-        @type group: str
-        @param group: room name
-        
-        @rtype: str
-        @return: the server's hostname
-        """
         try:
                 sn = specials[group]
         except KeyError:
@@ -103,15 +94,6 @@ def genUid():
 # Message stuff
 ################################################################
 def clean_message(msg):
-        """
-        Clean a message and return the message, n tag and f tag.
-        
-        @type msg: str
-        @param msg: the message
-        
-        @rtype: str, str, str
-        @returns: cleaned message, n tag contents, f tag contents
-        """
         n = re.search("<n(.*?)/>", msg)
         if n: n = n.group(1)
         f = re.search("<f(.*?)>", msg)
@@ -178,28 +160,18 @@ def getAnonId(n, ssid):
 ################################################################
 # PM Auth
 ################################################################
-auth_re = re.compile(r"auth\.chatango\.com ?= ?([^;]*)", re.IGNORECASE)
 def _getAuth(name, password):
-        data = urllib.parse.urlencode({
-                "user_id": name,
-                "password": password,
-                "storecookie": "on",
-                "checkerrors": "yes"
-        }).encode()
+        auth = urllib.request.urlopen("http://chatango.com/login",
+                                      urllib.parse.urlencode({
+                                              "user_id": name,
+                                              "password": password,
+                                              "storecookie": "on",
+                                              "checkerrors": "yes"}).encode()
+                                      ).getheader("Set-Cookie")
         try:
-                resp = urllib.request.urlopen("http://chatango.com/login", data)
-                headers = resp.headers
-        except Exception:
+                return re.search("auth.chatango.com=(.*?);", auth).group(1)
+        except:
                 return None
-        for header, value in headers.items():
-                if header.lower() == "set-cookie":
-                        m = auth_re.search(value)
-                        if m:
-                                auth = m.group(1)
-                                if auth == "":
-                                        return None
-                                return auth
-        return None
 ################################################################
 # PM class
 ################################################################
@@ -615,6 +587,7 @@ class Room:
         def rcmd_inited(self, args):
                 self._sendCommand("g_participants", "start")
                 self._sendCommand("getpremium", "1")
+                self._sendCommand("getratelimit")
                 self.requestUnbanlist()
                 self.requestBanlist()
                 if self._connectAmmount == 0:
@@ -652,7 +625,7 @@ class Room:
                 puid = args[3]
                 ip = args[6]
                 name = args[1]
-                rawmsg = ":".join(args[9:]) if self.unicodeCompat else ":".join(args[9:]).encode("ascii","ignore").decode("windows-1252")
+                rawmsg = ":".join(args[9:]) if self.unicodeCompat else ":".join(args[9:]).encode("windows-1252","ignore").decode("windows-1252")
                 msg, n, f = clean_message(rawmsg)
                 if name == "":
                         nameColor = None
@@ -840,7 +813,7 @@ class Room:
         # Commands
         ####
         def login(self, NAME, PASS = None):
-                NAME = NAME.lower()
+                NAME = NAME.title()
                 if PASS: self._sendCommand("blogin", NAME, PASS)
                 else: self._sendCommand("blogin", NAME)
                 self._currentname = NAME
@@ -867,7 +840,7 @@ class Room:
                 if self._currentname != None and not self._currentname.startswith('!anon'):
                         msg = "<f x%0.2i%s=\"%s\">" %(self.user.fontSize, self.user.fontColor, self.user.fontFace) + msg
                 if not self._silent:
-                        self._sendCommand("bmsg:p1jr", "<b>"+msg+"</b>")
+                        self._sendCommand("bmsg:p1jr", msg)
         def setBgMode(self, mode):
                 self._sendCommand("msgbg", str(mode))
         def setRecordingMode(self, mode):
@@ -906,9 +879,13 @@ class Room:
                         self._sendCommand("g_flag", msg.msgid)
                         return True
                 return False
-        def delete(self, message):
+        def delete(self, user):
                 if self.getLevel(User(self.currentname)) > 0:
-                        self._sendCommand("delmsg", message.msgid)
+                        msg = self.getLastMessage(user)
+                        if msg:
+                                self._sendCommand("delmsg", msg.msgid)
+                        return True
+                return False
         def clearUser(self, user):
                 if self.getLevel(User(self.currentname)) > 0:
                         msg = self.getLastMessage(user)
@@ -924,15 +901,15 @@ class Room:
                 return False
         def clearall(self):
                 """Clear all messages. (Owner only)""" ##<---BULLSHIT! :P
-                if User(self.currentname) == self._owner:
-                        self._sendCommand("clearall")
-                        return True
-                else:
-                        mArray = self._msgs.values()
-                        for user in list(set([x.user for x in mArray])):
-                                msg = self.getLastMessage(user)
-                                if msg and hasattr(msg, 'unid'):
-                                        self.clearUser(user)
+                if self.getLevel(User(self.currentname)) > 0:
+                        if User(self.currentname) == self._owner:
+                                self._sendCommand("clearall")
+                        else:
+                                mArray = self._msgs.values()
+                                for user in list(set([x.user for x in mArray])):
+                                        msg = self.getLastMessage(user)
+                                        if msg and hasattr(msg, 'unid'):
+                                                self.clearUser(user)
                         return True
                 return False
         def ban(self, user):
@@ -942,9 +919,11 @@ class Room:
                         unid = msg.unid
                 if unid:
                         if user.name[0] in ['!','#']:
-                                name = ''
-                        self._sendCommand("block", unid, msg.ip, user.name)
-                        self._sendCommand("delallmsg", unid, msg.ip, user.name)
+                                self._sendCommand("block", unid, msg.ip, "")
+                                self._sendCommand("delallmsg", unid, msg.ip, "")
+                        else:
+                                self._sendCommand("block", unid, msg.ip, user.name)
+                                self._sendCommand("delallmsg", unid, msg.ip, user.name)
                         return True
                 return False
         def requestBanlist(self):
@@ -1051,7 +1030,7 @@ class RoomManager:
         _userlistMemory = 500
         _userlistEventUnique = False
         _tooBigMessage = BigMessage_Multiple
-        _maxLength = 1800
+        _maxLength = 2000
         _maxHistoryLength = 15000000
         ####
         # Init
@@ -1220,7 +1199,7 @@ class RoomManager:
                                 if task.isInterval:
                                         task.target = now + task.timeout
                                 else:
-                                        self._tasks.remove(task)
+                                        self._tasks.discard(task)
         def setTimeout(self, timeout, func, *args, **kw):
                 task = self._Task()
                 task.mgr = self
@@ -1244,7 +1223,8 @@ class RoomManager:
                 self._tasks.add(task)
                 return task
         def removeTask(self, task):
-                self._tasks.remove(task)
+                if task in self._tasks:
+                        self._tasks.discard(task)
         ####
         # Util
         ####
