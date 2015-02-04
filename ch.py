@@ -724,7 +724,10 @@ class Room:
                 if args[0] == "0": #leave
                         name = args[3].lower()
                         if name == "none": return
-                        user = User(name)
+                        user = User(
+                                name = name,
+                                room = self
+                        )
                         user.removeSessionId(self, args[1])
                         self._userlist.remove(user)
                         if user not in self._userlist or not self.mgr._userlistEventUnique:
